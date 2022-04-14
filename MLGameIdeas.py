@@ -25,6 +25,7 @@ import argparse
 import os
 import gzip
 import json
+from progress.bar import Bar
 import random
 import numpy as np
 from keras.models import Sequential
@@ -74,10 +75,15 @@ if __name__ == "__main__":
 
   print(f'[i] {len(dataset)} descriptions, using {max_games}.')
 
-  descriptions = ''
+  filter = []
+  bar = Bar('[i] Importing descriptions', max=max_games)
   for entry in dataset[:max_games]:
     if 'full_desc' in entry:
-      descriptions += entry['full_desc']['desc'].lower() + ' '
+        filter.append(entry['full_desc']['desc'].lower())  
+    bar.next()
+  bar.finish()
+
+  descriptions = ' '.join(filter)
 
   chars = sorted(list(set(descriptions)))
   char_to_int = dict((c, i) for i, c in enumerate(chars))
