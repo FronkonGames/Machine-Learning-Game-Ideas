@@ -16,7 +16,7 @@
 __author__ = "Martin Bustos <fronkongames@gmail.com>"
 __copyright__ = "Copyright 2022, Martin Bustos"
 __license__ = "MIT"
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 __email__ = "fronkongames@gmail.com"
 
 import io
@@ -140,10 +140,7 @@ if __name__ == "__main__":
   if args.train == True:
     print('[i] Training model.')
     model.compile(loss='categorical_crossentropy', optimizer='adam')
-    
-    if exit(weights_file):
-        checkpoint = ModelCheckpoint(weights_file, monitor='loss', verbose=1, save_best_only=True, mode='min')
-
+    checkpoint = ModelCheckpoint(weights_file, monitor='loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
     model.fit(X, y, epochs=max_epochs, batch_size=batch_size, callbacks=callbacks_list)
   else:
@@ -157,7 +154,7 @@ if __name__ == "__main__":
     idea = ''
     for i in range(text_length):
       x = np.reshape(pattern, (1, len(pattern), 1))
-      x = x / float(n_vocab)
+      x = x / float(len(chars))
       prediction = model.predict(x, verbose=0)
       index = np.argmax(prediction)
       result = int_to_char[index]
