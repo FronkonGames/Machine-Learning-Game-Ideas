@@ -1,6 +1,6 @@
 <p align="center"><img src="images/banner.png"/></p>
 
-<p align="center">Game idea generation using neural networks</p>
+<p align="center"><b>Game Ideas Generation Using Neural Networks</b></p>
 </br>
 
 ## 🔧 Requisites
