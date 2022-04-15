@@ -16,7 +16,7 @@
 __author__ = "Martin Bustos <fronkongames@gmail.com>"
 __copyright__ = "Copyright 2022, Martin Bustos"
 __license__ = "MIT"
-__version__ = "0.0.3"
+__version__ = "0.1.0"
 __email__ = "fronkongames@gmail.com"
 
 import io
@@ -44,21 +44,22 @@ WEIGHTS_FILE = 'weights.hdf5'
 
 def BuildModel(units, x, y, dense):
   model = Sequential()
-  model.add(LSTM(units, input_shape=(x, y)))
+  model.add(LSTM(units, input_shape=(x, y), return_sequences=True))
+  model.add(Dropout(0.2))
+  model.add(LSTM(units))
   model.add(Dropout(0.2))
   model.add(Dense(dense, activation='softmax'))
-  
   return model
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Game idea generation using neural networks.')
-  parser.add_argument('-max-games', type=int, default=0, help='Maximum number of set descriptions to use, 0 to use them all')
-  parser.add_argument('-text-length', type=int, default=100, help='length of description to create')
-  parser.add_argument('-lstm-units', type=int, default=256, help='LSTM nodes')
-  parser.add_argument('-max-epochs', type=int, default=20, help='Number of epochs')
-  parser.add_argument('-batch-size', type=int, default=64, help='Number of training samples per iteration')
-  parser.add_argument('-dataset-file', type=ascii, default=DATASET_FILE, help='Dataset file')
-  parser.add_argument('-weights-file', type=ascii, default=WEIGHTS_FILE, help='Output file')
+  parser.add_argument('-games', type=int, default=0, help='Maximum number of set descriptions to use, 0 to use them all')
+  parser.add_argument('-length', type=int, default=100, help='length of description to create')
+  parser.add_argument('-units', type=int, default=256, help='LSTM nodes')
+  parser.add_argument('-epochs', type=int, default=20, help='Number of epochs')
+  parser.add_argument('-batch', type=int, default=64, help='Number of training samples per iteration')
+  parser.add_argument('-dataset', type=ascii, default=DATASET_FILE, help='Dataset file')
+  parser.add_argument('-weights', type=ascii, default=WEIGHTS_FILE, help='Output file')
   parser.add_argument('-train', action='store_true', help='Use to train the network, otherwise an idea will be generated')
   args = parser.parse_args()
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     parser.print_help()
     sys.exit(1)
 
-  dataset_file = args.dataset_file.replace("'", "")
+  dataset_file = args.dataset.replace("'", "")
 
   text = ''
   try:
@@ -81,12 +82,12 @@ if __name__ == "__main__":
     sys.exit(1)
 
   dataset = json.loads(text)
-  max_games = len(dataset) if args.max_games == 0 else min(len(dataset), args.max_games)
-  text_length = max(32, args.text_length)
-  lstm_units = max(32, args.lstm_units)
-  max_epochs = max(1, args.max_epochs)
-  batch_size = max(32, args.batch_size)
-  weights_file = args.weights_file.replace("'", "")
+  max_games = len(dataset) if args.games == 0 else min(len(dataset), args.games)
+  text_length = max(32, args.length)
+  lstm_units = max(32, args.units)
+  max_epochs = max(1, args.epochs)
+  batch_size = max(32, args.batch)
+  weights_file = args.weights.replace("'", "")
 
   filter = []
   bar = Bar(f'[i] Importing {max_games} descriptions', max=max_games)
@@ -143,11 +144,12 @@ if __name__ == "__main__":
     checkpoint = ModelCheckpoint(weights_file, monitor='loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
     model.fit(X, y, epochs=max_epochs, batch_size=batch_size, callbacks=callbacks_list)
+    
+    print('[!] Done.')
   else:
     print('[i] Generating game idea.')
     model.load_weights(weights_file)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
-    
     start = np.random.randint(0, len(dataX)-1)
     pattern = dataX[start]
     
