@@ -1,7 +1,7 @@
 <p align="center"><img src="images/banner.png"/></p>
 
 <p align="center"><b>Game Ideas Generation Using Neural Networks</b></p>
-</br>
+<br>
 
 # 🔧 Requisites
 
@@ -10,7 +10,7 @@
 - TensorFlow 2.8
 - Keras 2.8
 
-# ▶️ Usage
+# 🚀 Usage
 
 Before you can generate ideas for games you must train the neural network, for that run:
 
@@ -18,7 +18,7 @@ Before you can generate ideas for games you must train the neural network, for t
 python MLGamedevIdeas.py -train
 ```
 
-This will train the neural network with all the descriptions in the file '_final_data_new.json_' (about 80000), with 20 epochs.
+This will train the neural network with all the descriptions in the file '_final_data_new.json.gz_' (about 80000), with 20 epochs.
 Depending on your hardware this may take quite a while.
 
 To make the training process less time consuming you can use fewer game descriptions:
@@ -48,4 +48,8 @@ Now you can start generating crazy ideas:
 ```
 python MLGamedevIdeas.py
 ```
+
+## 📜 License
+
+Code released under [MIT License](https://github.com/FronkonGames/Machine-Learning-Game-Ideas/blob/main/LICENSE.md).
 
