@@ -40,7 +40,7 @@ from keras.utils import np_utils
 
 # '80000 Steam Games DataSet' by Deepan.N (https://www.kaggle.com/datasets/deepann/80000-steam-games-dataset)
 DATASET_FILE        = 'final_data_new.json.gz'
-PROCESSED_FILE      = 'processed.pickle'
+PROCESSED_FILE      = 'processed'
 WEIGHTS_FILE        = 'weights.hdf5'
 MODEL_LOSS          = 'categorical_crossentropy'
 MODEL_OPTIMIZER     = 'adam'
@@ -59,8 +59,8 @@ def LoadDescriptions(filename, max):
     else:
       with open(filename, 'r') as fin:
         text = fin.read()
-  except IOError:
-    print(f'[!] File \'{filename}\' not found.')  
+  except Exception as err:
+    print(f'[!] Error loading \'{filename}\': {err}.')  
     sys.exit(1)
 
   dataset = json.loads(text)
@@ -78,16 +78,20 @@ def LoadDescriptions(filename, max):
 
   return ' '.join(filter)
 
-def ProcessText(descriptions):
+def ProcessText(descriptions, max):
   '''
   Loads a file with the processed descriptions or processes them and creates a new file.
   '''
   processedText = None
 
-  if exists(f'{PROCESSED_FILE}.gz'):
-    print('[i] Importing preprocessed text.')
-    with gzip.open(f'{PROCESSED_FILE}.gz', 'rb') as fin:
-      processedText = pickle.load(fin)
+  if exists(f'{PROCESSED_FILE}_{max}.pickle.gz'):
+    print(f'[i] Importing preprocessed text \'{PROCESSED_FILE}_{max}.pickle.gz\'.')
+    try:
+      with gzip.open(f'{PROCESSED_FILE}_{max}.pickle.gz', 'rb') as fin:
+        processedText = pickle.load(fin)
+    except Exception as err:
+      print(f'[!] Error loading \'{PROCESSED_FILE}_{max}.pickle.gz\': {err}.')
+      sys.exit(1)
   else:
     chars = sorted(list(set(descriptions)))
     char_to_int = dict((c, i) for i, c in enumerate(chars))
@@ -123,8 +127,12 @@ def ProcessText(descriptions):
     }
 
     print('[i] Saving preprocessed text.')
-    with gzip.open(f'{PROCESSED_FILE}.gz', 'wb') as fout:
-      pickle.dump(processedText, fout)
+    try:
+      with gzip.open(f'{PROCESSED_FILE}_{max}.pickle.gz', 'wb') as fout:
+        pickle.dump(processedText, fout)
+    except Exception as err: 
+      print(f'[!] Error writing \'{PROCESSED_FILE}_{max}.pickle.gz\': {err}.')  
+      sys.exit(1)
 
   return processedText
 
@@ -140,6 +148,45 @@ def BuildModel(units, x, y, dropout, dense):
   model.add(Dense(dense, activation='softmax'))
 
   return model
+  
+def TrainModel(model, weights, epochs, batch):
+  '''
+  Train model.
+  '''
+  print('[i] Training model.')
+  model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
+  checkpoint = ModelCheckpoint(weights, monitor='loss', verbose=1, save_best_only=True, mode='min')
+  callbacks_list = [checkpoint]
+  model.fit(processedText['X'], processedText['y'], epochs=epochs, batch_size=batch, callbacks=callbacks_list)
+  model.summary()
+
+def GenerateGameIdea(model, weights, length, processedText):
+  '''
+  Generate game idea.
+  '''
+  if not exists(weights):
+    print(f'[!] {weights} not found, you must train the network first.')
+    sys.exit(1)
+
+  print('[i] Generating game idea.')
+  model.load_weights(weights)
+  model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
+  start = np.random.randint(0, len(processedText['dataX'])-1)
+  pattern = processedText['dataX'][start]
+
+  idea = ''
+  for i in range(length):
+    x = np.reshape(pattern, (1, len(pattern), 1))
+    x = x / float(len(processedText['chars']))
+    prediction = model.predict(x, verbose=0)
+    index = np.argmax(prediction)
+    result = processedText['int_to_char'][index]
+    seq_in = [processedText['int_to_char'][value] for value in pattern]
+    idea += result
+    pattern.append(index)
+    pattern = pattern[1:len(pattern)]
+
+  print(f'[i] Idea: \'{idea}\'.')
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Game idea generation using neural networks.')
@@ -150,7 +197,7 @@ if __name__ == "__main__":
   parser.add_argument('-batch', type=int, default=64, help='Number of training samples per iteration.')
   parser.add_argument('-dropout', type=float, default=0.2, help='.')
   parser.add_argument('-dataset', type=ascii, default=DATASET_FILE, help='Dataset file.')
-  parser.add_argument('-weights', type=ascii, default=WEIGHTS_FILE, help='Output file.')
+  parser.add_argument('-weights', type=ascii, default=WEIGHTS_FILE, help='Weights file.')
   parser.add_argument('-train', action='store_true', help='Use to train the network, otherwise an idea will be generated.')
   args = parser.parse_args()
 
@@ -167,40 +214,13 @@ if __name__ == "__main__":
 
   descriptions = LoadDescriptions(args.dataset, args.games)
   
-  processedText = ProcessText(descriptions)
+  processedText = ProcessText(descriptions, args.games)
 
   model = BuildModel(lstm_units, processedText['X'].shape[1], processedText['X'].shape[2], dropout, processedText['y'].shape[1])
 
   if args.train == True:
-    print('[i] Training model.')
-    model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
-    checkpoint = ModelCheckpoint(weights_file, monitor='loss', verbose=1, save_best_only=True, mode='min')
-    callbacks_list = [checkpoint]
-    model.fit(processedText['X'], processedText['y'], epochs=max_epochs, batch_size=batch_size, callbacks=callbacks_list)
-    model.summary()
-    
-    print('[i] Done.')
+    TrainModel(model, weights_file, max_epochs, batch_size)
   else:
-    if not exists(weights_file):
-      print(f'[!] {weights_file} not found, you must train the network first.')
-      sys.exit(1)
-  
-    print('[i] Generating game idea.')
-    model.load_weights(weights_file)
-    model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
-    start = np.random.randint(0, len(processedText['dataX'])-1)
-    pattern = processedText['dataX'][start]
-    
-    idea = ''
-    for i in range(text_length):
-      x = np.reshape(pattern, (1, len(pattern), 1))
-      x = x / float(len(processedText['chars']))
-      prediction = model.predict(x, verbose=0)
-      index = np.argmax(prediction)
-      result = processedText['int_to_char'][index]
-      seq_in = [processedText['int_to_char'][value] for value in pattern]
-      idea += result
-      pattern.append(index)
-      pattern = pattern[1:len(pattern)]
+    GenerateGameIdea(model, weights_file, text_length, processedText)
 
-    print(f'[i] Idea: \'{idea}\'.')
+  print('[i] Done.')

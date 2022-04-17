@@ -2,6 +2,13 @@
 
 <p align="center"><b>Game Ideas Generation Using Neural Networks</b></p>
 <br>
+<!--
+<p align="center">
+  <a style="text-decoration:none">
+    <img src="https://img.shields.io/github/pipenv/locked/python-version/FronkonGames/Machine-Learning-Game-Ideas" alt="python" />
+  </a>  
+</p>
+-->
 
 # 🔧 Requisites
 
@@ -12,25 +19,24 @@
 
 # 🚀 Usage
 
-Before you can generate ideas for games you must train the neural network, for that run:
+Before you can generate ideas for games you must train the neural network:
 
 ```
 python MLGamedevIdeas.py -train
 ```
 
-This will train the neural network with all the descriptions in the file '_final_data_new.json.gz_' (about 80000), with 20 epochs.
-Depending on your hardware this may take quite a while.
-
+This will train the neural network with all the descriptions in the file '_final_data_new.json.gz_' (about 80000) and 20 epochs.
+Depending on your hardware this may take quite a while. 
 To make the training process less time consuming you can use fewer game descriptions:
 
 ```
-python MLGamedevIdeas.py -games 100 -train
+python MLGamedevIdeas.py -games 5000 -train
 ```
 
 You can also use less epochs:
 
 ```
-python MLGamedevIdeas.py -epochs 10 -train
+python MLGamedevIdeas.py -games 5000 -epochs 10 -train
 ```
 
 For good results I recommend values of '_loss_' below 2. Consult the parameters to better adjust the training:
@@ -52,4 +58,3 @@ python MLGamedevIdeas.py
 ## 📜 License
 
 Code released under [MIT License](https://github.com/FronkonGames/Machine-Learning-Game-Ideas/blob/main/LICENSE.md).
-
