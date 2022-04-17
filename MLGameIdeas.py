@@ -16,7 +16,7 @@
 __author__ = "Martin Bustos <fronkongames@gmail.com>"
 __copyright__ = "Copyright 2022, Martin Bustos"
 __license__ = "MIT"
-__version__ = "0.1.1"
+__version__ = "0.9.0"
 __email__ = "fronkongames@gmail.com"
 
 import io
@@ -39,10 +39,11 @@ from keras.callbacks import ModelCheckpoint
 from keras.utils import np_utils
 
 # '80000 Steam Games DataSet' by Deepan.N (https://www.kaggle.com/datasets/deepann/80000-steam-games-dataset)
-DATASET_FILE    = 'final_data_new.json.gz'
-WEIGHTS_FILE    = 'weights.hdf5'
-MODEL_LOSS      = 'categorical_crossentropy'
-MODEL_OPTIMIZER = 'adam'
+DATASET_FILE        = 'final_data_new.json.gz'
+PROCESSED_FILE      = 'processed.pickle'
+WEIGHTS_FILE        = 'weights.hdf5'
+MODEL_LOSS          = 'categorical_crossentropy'
+MODEL_OPTIMIZER     = 'adam'
 
 def LoadDescriptions(filename, max):
   '''
@@ -77,17 +78,55 @@ def LoadDescriptions(filename, max):
 
   return ' '.join(filter)
 
-def ProcessText():
+def ProcessText(descriptions):
   '''
-  TODO.
+  Loads a file with the processed descriptions or processes them and creates a new file.
   '''
-  return None
+  processedText = None
 
-def LoadProcessedText():
-  '''
-  TODO.
-  '''
-  return None
+  if exists(f'{PROCESSED_FILE}.gz'):
+    print('[i] Importing preprocessed text.')
+    with gzip.open(f'{PROCESSED_FILE}.gz', 'rb') as fin:
+      processedText = pickle.load(fin)
+  else:
+    chars = sorted(list(set(descriptions)))
+    char_to_int = dict((c, i) for i, c in enumerate(chars))
+    int_to_char = dict((i, c) for i, c in enumerate(chars))
+    n_chars = len(descriptions)
+
+    print(f'[i] {n_chars} total chars, {len(chars)} unique chars.')
+  
+    dataX = []
+    dataY = []
+    bar = Bar('[i] Processing text', max=n_chars - text_length)
+    for i in range(0, n_chars - text_length, 1):
+      seq_in = descriptions[i:i + text_length]
+      seq_out = descriptions[i + text_length]
+      dataX.append([char_to_int[char] for char in seq_in])
+      dataY.append(char_to_int[seq_out])
+      bar.next()
+    bar.finish()
+    n_patterns = len(dataX)
+    print(f'[i] {n_patterns} patterns.')
+
+    X = np.reshape(dataX, (n_patterns, text_length, 1))
+    X = X / float(len(chars))
+    y = np_utils.to_categorical(dataY)
+
+    processedText = {
+      'chars': chars,
+      'char_to_int': char_to_int,
+      'int_to_char': int_to_char,
+      'X': X,
+      'y': y,
+      'dataX': dataX    
+    }
+
+    print('[i] Saving preprocessed text.')
+    with gzip.open(f'{PROCESSED_FILE}.gz', 'wb') as fout:
+      pickle.dump(processedText, fout)
+
+  return processedText
 
 def BuildModel(units, x, y, dropout, dense):
   '''
@@ -127,68 +166,39 @@ if __name__ == "__main__":
   weights_file = args.weights.replace("'", "")
 
   descriptions = LoadDescriptions(args.dataset, args.games)
-
-  chars = sorted(list(set(descriptions)))
-  char_to_int = dict((c, i) for i, c in enumerate(chars))
-  int_to_char = dict((i, c) for i, c in enumerate(chars))
-  n_chars = len(descriptions)
-
-  print(f'[i] {n_chars} total chars, {len(chars)} unique chars.')
   
-  dataX = []
-  dataY = []
-  bar = Bar('[i] Processing descriptions', max=n_chars - text_length)
-  for i in range(0, n_chars - text_length, 1):
-    seq_in = descriptions[i:i + text_length]
-    seq_out = descriptions[i + text_length]
-    dataX.append([char_to_int[char] for char in seq_in])
-    dataY.append(char_to_int[seq_out])
-    bar.next()
-  bar.finish()
-  n_patterns = len(dataX)
-  print(f'[i] {n_patterns} patterns.')
+  processedText = ProcessText(descriptions)
 
-  X = np.reshape(dataX, (n_patterns, text_length, 1))
-  X = X / float(len(chars))
-  y = np_utils.to_categorical(dataY)
-  '''
-  processedText = {
-	'char_to_int': char_to_int,
-	'int_to_char': int_to_char,
-	'X': X,
-	'y': y    
-  }
-
-  with open(f'processed{max_games}.pkl', 'wb') as fin:
-    pickle.dump(processedText, fin)
-  '''
-
-  model = BuildModel(lstm_units, X.shape[1], X.shape[2], dropout, y.shape[1])
+  model = BuildModel(lstm_units, processedText['X'].shape[1], processedText['X'].shape[2], dropout, processedText['y'].shape[1])
 
   if args.train == True:
     print('[i] Training model.')
     model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
     checkpoint = ModelCheckpoint(weights_file, monitor='loss', verbose=1, save_best_only=True, mode='min')
     callbacks_list = [checkpoint]
-    model.fit(X, y, epochs=max_epochs, batch_size=batch_size, callbacks=callbacks_list)
+    model.fit(processedText['X'], processedText['y'], epochs=max_epochs, batch_size=batch_size, callbacks=callbacks_list)
     model.summary()
     
     print('[i] Done.')
   else:
+    if not exists(weights_file):
+      print(f'[!] {weights_file} not found, you must train the network first.')
+      sys.exit(1)
+  
     print('[i] Generating game idea.')
     model.load_weights(weights_file)
     model.compile(loss=MODEL_LOSS, optimizer=MODEL_OPTIMIZER)
-    start = np.random.randint(0, len(dataX)-1)
-    pattern = dataX[start]
+    start = np.random.randint(0, len(processedText['dataX'])-1)
+    pattern = processedText['dataX'][start]
     
     idea = ''
     for i in range(text_length):
       x = np.reshape(pattern, (1, len(pattern), 1))
-      x = x / float(len(chars))
+      x = x / float(len(processedText['chars']))
       prediction = model.predict(x, verbose=0)
       index = np.argmax(prediction)
-      result = int_to_char[index]
-      seq_in = [int_to_char[value] for value in pattern]
+      result = processedText['int_to_char'][index]
+      seq_in = [processedText['int_to_char'][value] for value in pattern]
       idea += result
       pattern.append(index)
       pattern = pattern[1:len(pattern)]
